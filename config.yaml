@@ -1,0 +1,25 @@
+# =========================
+# Dataset paths
+# =========================
+image_path: "data/original"
+mask_path: "data/ground_truth"
+image_ext: ".png"
+
+# =========================
+# Image settings (IMPROVED)
+# =========================
+image_size: 384
+
+# =========================
+# Training settings (IMPROVED)
+# =========================
+epochs: 80
+batch_size: 4
+learning_rate: 0.0001
+
+# =========================
+# Output paths
+# =========================
+model_path: "models/best_model_unet++.pth"
+log_path: "logs/training_log.csv"
+result_path: "results"
