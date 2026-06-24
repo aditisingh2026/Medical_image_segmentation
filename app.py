@@ -82,6 +82,11 @@ def list_dataset_ids():
     return sorted(ids)
 
 
+@st.cache_data
+def load_results():
+    return pd.read_csv("comparison_results.csv")
+
+
 # ============================================================
 # INFERENCE HELPERS
 # ============================================================
@@ -262,72 +267,68 @@ with tab_explore:
 # TAB 2 — aggregate comparison across the whole dataset
 # ------------------------------------------------------------
 with tab_aggregate:
-    st.subheader("Run both models across the full dataset")
+    st.subheader("Aggregate comparison on the full test dataset")
     st.caption(
-        "This computes IoU/Dice for every image with a ground truth mask. "
-        "May take a minute depending on dataset size."
+        "Results below were precomputed on the complete dataset and loaded instantly."
     )
 
-    if st.button("Run aggregate comparison"):
-        ids = list_dataset_ids()
-        progress = st.progress(0, text="Running models...")
+    results_df = load_results()
 
-        rows = []
-        for i, img_id in enumerate(ids):
-            _, img_resized, gt_resized = load_image_and_mask(img_id)
-            if gt_resized is None:
-                continue
+    st.divider()
+    st.subheader("Summary")
 
-            img_tensor = preprocess(img_resized)
-            unet_pred, _ = predict(unet_model, img_tensor, is_unet=True)
-            deeplab_pred, _ = predict(deeplab_model, img_tensor, is_unet=False)
+    summary_cols = st.columns(4)
 
-            u_iou, u_dice = compute_metrics(unet_pred, gt_resized)
-            d_iou, d_dice = compute_metrics(deeplab_pred, gt_resized)
+    summary_cols[0].metric(
+        "UNet++ mean IoU",
+        f"{results_df['unet_iou'].mean():.4f}"
+    )
 
-            rows.append({
-                "image_id": img_id,
-                "unet_iou": u_iou, "unet_dice": u_dice,
-                "deeplab_iou": d_iou, "deeplab_dice": d_dice,
-            })
-            progress.progress((i + 1) / len(ids), text=f"Processing {img_id}...")
+    summary_cols[1].metric(
+        "DeepLabV3+ mean IoU",
+        f"{results_df['deeplab_iou'].mean():.4f}"
+    )
 
-        progress.empty()
-        results_df = pd.DataFrame(rows)
-        st.session_state["results_df"] = results_df
+    summary_cols[2].metric(
+        "UNet++ mean Dice",
+        f"{results_df['unet_dice'].mean():.4f}"
+    )
 
-    if "results_df" in st.session_state:
-        results_df = st.session_state["results_df"]
+    summary_cols[3].metric(
+        "DeepLabV3+ mean Dice",
+        f"{results_df['deeplab_dice'].mean():.4f}"
+    )
 
-        st.divider()
-        st.subheader("Summary")
+    unet_wins = (results_df["unet_iou"] > results_df["deeplab_iou"]).sum()
+    deeplab_wins = (results_df["deeplab_iou"] > results_df["unet_iou"]).sum()
+    ties = len(results_df) - unet_wins - deeplab_wins
 
-        summary_cols = st.columns(4)
-        summary_cols[0].metric("UNet++ mean IoU", f"{results_df['unet_iou'].mean():.4f}")
-        summary_cols[1].metric("DeepLabV3+ mean IoU", f"{results_df['deeplab_iou'].mean():.4f}")
-        summary_cols[2].metric("UNet++ mean Dice", f"{results_df['unet_dice'].mean():.4f}")
-        summary_cols[3].metric("DeepLabV3+ mean Dice", f"{results_df['deeplab_dice'].mean():.4f}")
+    st.write(
+        f"**UNet++ has higher IoU on {unet_wins} images ({unet_wins/len(results_df)*100:.1f}%)** — "
+        f"**DeepLabV3+ on {deeplab_wins} images ({deeplab_wins/len(results_df)*100:.1f}%)** — "
+        f"**{ties} ties**"
+    )
 
-        unet_wins = (results_df["unet_iou"] > results_df["deeplab_iou"]).sum()
-        deeplab_wins = (results_df["deeplab_iou"] > results_df["unet_iou"]).sum()
-        ties = len(results_df) - unet_wins - deeplab_wins
+    st.divider()
 
-        st.write(
-            f"**UNet++ has higher IoU on {unet_wins} images ({unet_wins/len(results_df)*100:.1f}%)** — "
-            f"**DeepLabV3+ on {deeplab_wins} images ({deeplab_wins/len(results_df)*100:.1f}%)** — "
-            f"**{ties} ties**"
-        )
+    st.subheader("Per-image results")
 
-        st.divider()
-        st.subheader("Per-image results")
-        st.dataframe(
-            results_df.style.format({
-                "unet_iou": "{:.4f}", "unet_dice": "{:.4f}",
-                "deeplab_iou": "{:.4f}", "deeplab_dice": "{:.4f}",
-            }),
-            use_container_width=True,
-            hide_index=True,
-        )
+    st.dataframe(
+        results_df.style.format({
+            "unet_iou": "{:.4f}",
+            "unet_dice": "{:.4f}",
+            "deeplab_iou": "{:.4f}",
+            "deeplab_dice": "{:.4f}",
+        }),
+        use_container_width=True,
+        hide_index=True,
+    )
 
-        csv = results_df.to_csv(index=False).encode("utf-8")
-        st.download_button("Download full results as CSV", csv, "comparison_results.csv", "text/csv")
+    csv = results_df.to_csv(index=False).encode("utf-8")
+
+    st.download_button(
+        "Download full results as CSV",
+        csv,
+        "comparison_results.csv",
+        "text/csv"
+    )
