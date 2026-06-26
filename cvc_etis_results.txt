@@ -1,0 +1,12 @@
+CROSS-DATASET GENERALIZATION RESULTS
+Trained on: own colonoscopy dataset (610 images)
+Tested on:  CVC-ColonDB and ETIS-LaribPolypDB (independent, never seen during training)
+
+
+CVC-ColonDB (380 images)
+  UNet++      ->  IoU: 0.3723   Dice: 0.5065
+  DeepLabV3+  ->  IoU: 0.5614   Dice: 0.6706
+
+ETIS-LaribPolypDB (196 images)
+  UNet++      ->  IoU: 0.1122   Dice: 0.1816
+  DeepLabV3+  ->  IoU: 0.2718   Dice: 0.3760
